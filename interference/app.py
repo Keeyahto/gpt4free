@@ -2,7 +2,27 @@ import os
 import time
 import json
 import random
-
+from g4f.Provider import (
+    Ails,
+    You,
+    Bing,
+    Yqcloud,
+    Theb,
+    Aichat,
+    Bard,
+    Vercel,
+    Forefront,
+    Lockchat,
+    Liaobots,
+    H2o,
+    ChatgptLogin,
+    DeepAi,
+    GetGpt,
+    Aws,
+    Ora,
+    Phind,
+    Pierangelo
+)
 from g4f import Model, ChatCompletion, Provider
 from flask import Flask, request, Response
 from flask_cors import CORS
@@ -10,19 +30,72 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
+providers = [
+    #Ails,
+    #You,
+    Bing,
+    #Yqcloud,
+    #Theb,
+    Aichat,
+    Bard,
+    Vercel,
+    Forefront,
+    Lockchat,
+    Liaobots,
+    H2o,
+    ChatgptLogin,
+    DeepAi,
+    GetGpt,
+    Aws,
+    Ora,
+    Phind,
+    Pierangelo
+]
+
+
+def get_working_provider(model, streaming):
+    for provider in providers:
+        try:
+            ChatCompletion.create(model=model, stream=streaming, messages=[
+                                     {"role": "user", "content": "Привет!"}], provider=provider)
+            return provider
+        except Exception:
+            continue
+
+    # Если все провайдеры не работают, можно выбрать дефолтный провайдер
+    # или выполнять дополнительные действия, например, отправить уведомление администратору
+    # В данном примере, если нет работающего провайдера, вернем None
+    return None
+
+
+provider = Bing
+model_name = 'gpt-4'
+
 @app.route("/chat/completions", methods=['POST'])
 def chat_completions():
+    global provider
     streaming = request.json.get('stream', False)
-    model = request.json.get('model', 'gpt-3.5-turbo')
+    print(request.json)
+    model = request.json.get('model', model_name)
     messages = request.json.get('messages')
-    
-    response = ChatCompletion.create(model=model, stream=streaming,
-                                     messages=messages)
-    
+    try:
+        response = ChatCompletion.create(model=model, stream=streaming, messages=messages, provider=provider)
+    except:
+        provider = get_working_provider(model_name, request.json.get('stream', False))
+        if provider is None:
+            # Если нет работающего провайдера, возвращаем ошибку
+            raise Exception('No working provider available')
+        response = ChatCompletion.create(model=model, stream=streaming, messages=messages, provider=provider)
     if not streaming:
         while 'curl_cffi.requests.errors.RequestsError' in response:
-            response = ChatCompletion.create(model=model, stream=streaming,
-                                             messages=messages)
+            try:
+                response = ChatCompletion.create(model=model, stream=streaming, messages=messages, provider=provider)
+            except:
+                provider = get_working_provider(model_name, request.json.get('stream', False))
+                if provider is None:
+                    # Если нет работающего провайдера, возвращаем ошибку
+                    raise Exception('No working provider available')
+                response = ChatCompletion.create(model=model, stream=streaming, messages=messages, provider=provider)
 
         completion_timestamp = int(time.time())
         completion_id = ''.join(random.choices(
